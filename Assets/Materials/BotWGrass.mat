@@ -90,6 +90,15 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _AlphaClip: 0
+    - _BendDelta: 0.2
+    - _BladeHeight: 0.25
+    - _BladeHeightDelta: 0.05
+    - _BladeHeightMax: 0.405
+    - _BladeHeightMin: 0.184
+    - _BladeWidth: 0.015
+    - _BladeWidthDelta: 0.02
+    - _BladeWidthMax: 0.025
+    - _BladeWidthMin: 0.005
     - _Blend: 0
     - _BumpScale: 1
     - _ClearCoatMask: 0
@@ -113,12 +122,14 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Surface: 0
+    - _TesselationFactor: 16
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.11764706, g: 0.9137255, b: 0.13333334, a: 1}
+    - _BaseColor: {r: 0.0979441, g: 0.6698113, b: 0.10921237, a: 1}
     - _Color: {r: 0.11764706, g: 0.9137255, b: 0.13333334, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _GroundColor: {r: 0.5660378, g: 0.45540816, b: 0.32306874, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TipColor: {r: 0.4179868, g: 0.9528302, b: 0.42852554, a: 1}
+    - _TipColor: {r: 0.5613208, g: 1, b: 0.56480235, a: 1}
   m_BuildTextureStacks: []
