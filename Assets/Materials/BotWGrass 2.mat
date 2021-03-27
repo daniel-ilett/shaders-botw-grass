@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: BotWGrass
+  m_Name: BotWGrass 2
   m_Shader: {fileID: 4800000, guid: 72e68f904ae08fc4299172cfb53712c6, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
@@ -138,12 +138,12 @@ Material:
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.67058825, g: 0.50143534, b: 0.0980392, a: 1}
+    - _BaseColor: {r: 0.21244211, g: 0.5849056, b: 0.22120592, a: 1}
     - _Color: {r: 0.11764706, g: 0.9137255, b: 0.13333334, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _GroundColor: {r: 0.5660378, g: 0.45540816, b: 0.32306874, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TipColor: {r: 0.99358773, g: 1, b: 0.56078434, a: 1}
+    - _TipColor: {r: 0.47770557, g: 0.8962264, b: 0.48615223, a: 1}
     - _WindDirection: {r: 1, g: 0, b: 0, a: 0}
     - _WindVelocity: {r: 0, g: 0.15, b: 0, a: 0}
   m_BuildTextureStacks: []

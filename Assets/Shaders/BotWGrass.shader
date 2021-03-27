@@ -8,14 +8,20 @@ Shader "Custom/BotWGrass"
 
 		_BladeWidthMin("Blade Width (Min)", Range(0, 0.1)) = 0.02
 		_BladeWidthMax("Blade Width (Max)", Range(0, 0.1)) = 0.05
-		_BladeHeightMin("Blade Height (Min)", Range(0, 0.5)) = 0.1
-		_BladeHeightMax("Blade Height (Max)", Range(0, 0.5)) = 0.2
+		_BladeHeightMin("Blade Height (Min)", Range(0, 1)) = 0.1
+		_BladeHeightMax("Blade Height (Max)", Range(0, 1)) = 0.2
 
 		_BendDelta("Bend Variation", Range(0, 1)) = 0.2
 
 		_TesselationFactor("Tesselation Subdivisions", Range(1, 32)) = 1
 
 		_GrassMap("Grass Visibility Map", 2D) = "white" {}
+		_GrassThreshold("Grass Visibility Threshold", Range(-0.1, 1)) = 0.5
+		_GrassFalloff("Grass Visibility Fade-In Falloff", Range(0, 0.5)) = 0.05
+
+		_WindMap("Wind Offset Map", 2D) = "bump" {}
+		_WindVelocity("Wind Velocity", Vector) = (1, 0, 0, 0)
+		_WindFrequency("Wind Pulse Frequency", Range(0, 1)) = 0.01
 	}
 		SubShader
 	{
@@ -48,10 +54,15 @@ Shader "Custom/BotWGrass"
 
 				float _TesselationFactor;
 				
-				//TEXTURE2D(_GrassMap);
-				//SAMPLER(sampler_GrassMap);
 				sampler2D _GrassMap;
 				float4 _GrassMap_ST;
+				float  _GrassThreshold;
+				float  _GrassFalloff;
+
+				sampler2D _WindMap;
+				float4 _WindMap_ST;
+				float4 _WindVelocity;
+				float  _WindFrequency;
 			CBUFFER_END
 
 			struct VertexInput
@@ -151,6 +162,10 @@ Shader "Custom/BotWGrass"
 			// Tesselation hull and domain shaders derived from Catlike Coding's tutorial:
 			// https://catlikecoding.com/unity/tutorials/advanced-rendering/tessellation/
 
+			// The patch constant function is where we create new control
+			// points on the patch. For the edges, increasing the tessellation
+			// factors adds new vertices on the edge. Increasing the inside
+			// will add more 'layers' inside the new triangle.
 			TessellationFactors patchConstantFunc(InputPatch<VertexInput, 3> patch)
 			{
 				TessellationFactors f;
@@ -163,6 +178,12 @@ Shader "Custom/BotWGrass"
 				return f;
 			}
 
+			// The hull function is the first half of the tesselation shader.
+			// It operates on each patch (in our case, a patch is a triangle),
+			// and outputs new control points for the other tessellation stages.
+			//
+			// The patch constant function is where we create new control points
+			// (which are kind of like new vertices).
 			[domain("tri")]
 			[outputcontrolpoints(3)]
 			[outputtopology("triangle_cw")]
@@ -173,6 +194,13 @@ Shader "Custom/BotWGrass"
 				return patch[id];
 			}
 
+			// In between the hull shader stage and the domain shader stage, the
+			// tessellation stage takes place. This is where, under the hood,
+			// the graphics pipeline actually generates the new vertices.
+
+			// The domain function is the second half of the tessellation shader.
+			// It interpolates the properties of the vertices (position, normal, etc.)
+			// to create new vertices.
 			[domain("tri")]
 			VertexOutput domain(TessellationFactors factors, OutputPatch<VertexInput, 3> patch, float3 barycentricCoordinates : SV_DomainLocation)
 			{
@@ -194,6 +222,8 @@ Shader "Custom/BotWGrass"
 			// Geometry functions derived from Roystan's tutorial:
 			// https://roystan.net/articles/grass-shader.html
 
+			// This function applies a transformation (during the geometry shader),
+			// converting to clip space in the process.
 			GeomData TransformGeomToLocal(float3 pos, float3 offset, float3x3 transformationMatrix, float2 uv)
 			{
 				GeomData o;
@@ -204,12 +234,14 @@ Shader "Custom/BotWGrass"
 				return o;
 			}
 
+			// This is the geometry shader. For each vertex on the mesh, a leaf
+			// blade is created by generating additional vertices.
 			[maxvertexcount(3)]
 			void geom(point VertexOutput input[1], inout TriangleStream<GeomData> triStream)
 			{
-				float grassVisibility = tex2Dlod(_GrassMap, float4(input[0].uv, 0, 0));
+				float grassVisibility = tex2Dlod(_GrassMap, float4(input[0].uv, 0, 0)).x;
 
-				if (grassVisibility > 0.2155f)
+				if (grassVisibility >= _GrassThreshold)
 				{
 					float3 pos = input[0].vertex.xyz;
 
@@ -223,22 +255,42 @@ Shader "Custom/BotWGrass"
 						tangent.y, binormal.y, normal.y,
 						tangent.z, binormal.z, normal.z
 					);
+
+					// Rotate around the y-axis a random amount.
 					float3x3 randRotMatrix = angleAxis3x3(rand(pos) * UNITY_TWO_PI, float3(0, 0, 1.0f));
+
+					// Rotate around the bottom of the blade a random amount.
 					float3x3 randBendMatrix = angleAxis3x3(rand(pos.zzx) * _BendDelta * UNITY_PI * 0.5f, float3(-1.0f, 0, 0));
-					float3x3 transformationMatrix = mul(mul(tangentToLocal, randRotMatrix), randBendMatrix);
 
-					float width = lerp(_BladeWidthMin, _BladeWidthMax, rand(pos.xzy));
-					float height = lerp(_BladeHeightMin, _BladeHeightMax, rand(pos.zyx));
+					float2 windUV = pos.xz * _WindMap_ST.xy + _WindMap_ST.zw + normalize(_WindVelocity.xzy) * _WindFrequency * _Time.y;
+					float2 windSample = (tex2Dlod(_WindMap, float4(windUV, 0, 0)).xy * 2 - 1) * length(_WindVelocity);
 
-					triStream.Append(TransformGeomToLocal(pos, float3(width, 0, 0), transformationMatrix, float2(0, 0)));
-					triStream.Append(TransformGeomToLocal(pos, float3(-width, 0, 0), transformationMatrix, float2(1, 0)));
-					triStream.Append(TransformGeomToLocal(pos, float3(0, 0, height), transformationMatrix, float2(0.5, 1)));
+					float3 windAxis = normalize(float3(windSample.x, windSample.y, 0));
+					float3x3 windMatrix = angleAxis3x3(UNITY_PI * windSample, windAxis);
+
+
+
+
+					float3x3 baseTransformationMatrix = mul(tangentToLocal, randRotMatrix);
+					float3x3 tipTransformationMatrix = mul(mul(mul(tangentToLocal, windMatrix), randBendMatrix), randRotMatrix);
+
+					float falloff = smoothstep(_GrassThreshold, _GrassThreshold + _GrassFalloff, grassVisibility);
+					float minWidth = falloff * _BladeWidthMin;
+					float minHeight = falloff * _BladeHeightMin;
+
+					float width  = lerp(_BladeWidthMin, _BladeWidthMax, rand(pos.xzy) * falloff);
+					float height = lerp(_BladeHeightMin, _BladeHeightMax, rand(pos.zyx) * falloff);
+
+					triStream.Append(TransformGeomToLocal(pos, float3(width, 0, 0), baseTransformationMatrix, float2(0, 0)));
+					triStream.Append(TransformGeomToLocal(pos, float3(-width, 0, 0), baseTransformationMatrix, float2(1, 0)));
+					triStream.Append(TransformGeomToLocal(pos, float3(0, 0, height), tipTransformationMatrix, float2(0.5, 1)));
 
 					triStream.RestartStrip();
 				}
 			}
 		ENDHLSL
 
+		// This pass draws the ground beneath the grass, i.e. the original mesh.
 		Pass
 		{
 			Name "GroundPass"
@@ -255,6 +307,7 @@ Shader "Custom/BotWGrass"
 			ENDHLSL
 		}
 
+		// This pass draws the grass blades generated by the geometry shader.
         Pass
         {
 			Name "GrassPass"
