@@ -12,6 +12,9 @@ Shader "Custom/BotWGrass"
 		_BladeHeightMin("Blade Height (Min)", Range(0, 1)) = 0.1
 		_BladeHeightMax("Blade Height (Max)", Range(0, 1)) = 0.2
 
+		_BladeBendDistance("Blade Forward Amount", Float) = 0.38
+		_BladeBendCurve("Blade Curvature Amount", Range(1, 4)) = 2
+
 		_BendDelta("Bend Variation", Range(0, 1)) = 0.2
 
 		_TesselationFactor("Tesselation Subdivisions", Range(1, 32)) = 1
@@ -39,6 +42,7 @@ Shader "Custom/BotWGrass"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 			#define UNITY_PI 3.14159265359f
 			#define UNITY_TWO_PI 6.28318530718f
+			#define BLADE_SEGMENTS 3
 
 			CBUFFER_START(UnityPerMaterial)
 				float4 _GroundColor;
@@ -51,6 +55,9 @@ Shader "Custom/BotWGrass"
 				float _BladeWidthMax;
 				float _BladeHeightMin;
 				float _BladeHeightMax;
+
+				float _BladeBendDistance;
+				float _BladeBendCurve;
 
 				float _BendDelta;
 
@@ -236,9 +243,19 @@ Shader "Custom/BotWGrass"
 				return o;
 			}
 
+			/*
+			GeomData CreateGrassVertex(float3 pos, float width, float height, float2 uv, float3x3 transformationMatrix)
+			{
+				float3 tangentPos = float3(width, 0, height);
+				float3 localPos = pos + mul(transformationMatrix, tangentPos);
+
+				return TransformGeomToLocal(localPos, uv);
+			}
+			*/
+
 			// This is the geometry shader. For each vertex on the mesh, a leaf
 			// blade is created by generating additional vertices.
-			[maxvertexcount(3)]
+			[maxvertexcount(BLADE_SEGMENTS * 2 + 1)]
 			void geom(point VertexOutput input[1], inout TriangleStream<GeomData> triStream)
 			{
 				float grassVisibility = tex2Dlod(_GrassMap, float4(input[0].uv, 0, 0)).x;
@@ -282,10 +299,22 @@ Shader "Custom/BotWGrass"
 
 					float width  = lerp(_BladeWidthMin, _BladeWidthMax, rand(pos.xzy) * falloff);
 					float height = lerp(_BladeHeightMin, _BladeHeightMax, rand(pos.zyx) * falloff);
+					float forward = rand(pos.yyz) * _BladeBendDistance;
 
-					triStream.Append(TransformGeomToLocal(pos, float3(width, 0, 0), baseTransformationMatrix, float2(0, 0)));
-					triStream.Append(TransformGeomToLocal(pos, float3(-width, 0, 0), baseTransformationMatrix, float2(1, 0)));
-					triStream.Append(TransformGeomToLocal(pos, float3(0, 0, height), tipTransformationMatrix, float2(0.5, 1)));
+					// Create blade segments by adding two vertices at once.
+					for (int i = 0; i < BLADE_SEGMENTS; ++i)
+					{
+						float t = i / (float)BLADE_SEGMENTS;
+						float3 offset = float3(width * (1 - t), pow(t, _BladeBendCurve) * forward, height * t);
+
+						float3x3 transformationMatrix = (i == 0) ? baseTransformationMatrix : tipTransformationMatrix;
+
+						triStream.Append(TransformGeomToLocal(pos, float3( offset.x, offset.y, offset.z), transformationMatrix, float2(0, t)));
+						triStream.Append(TransformGeomToLocal(pos, float3(-offset.x, offset.y, offset.z), transformationMatrix, float2(1, t)));
+					}
+
+					// Add the final vertex at the tip of the grass blade.
+					triStream.Append(TransformGeomToLocal(pos, float3(0, forward, height), tipTransformationMatrix, float2(0.5, 1)));
 
 					triStream.RestartStrip();
 				}

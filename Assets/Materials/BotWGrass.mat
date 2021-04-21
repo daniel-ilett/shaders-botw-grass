@@ -36,6 +36,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _BladeTexture:
+        m_Texture: {fileID: 2800000, guid: 1de23163edf2fd341b1af5a6542b47c7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _BumpMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -99,14 +103,18 @@ Material:
     m_Floats:
     - _AlphaClip: 0
     - _BendDelta: 0.2
+    - _BladeBendCurve: 2
+    - _BladeBendDistance: 0.38
+    - _BladeCurve: 2
+    - _BladeForward: 0.38
     - _BladeHeight: 0.25
     - _BladeHeightDelta: 0.05
     - _BladeHeightMax: 0.75
-    - _BladeHeightMin: 0.4
+    - _BladeHeightMin: 0.5
     - _BladeWidth: 0.015
     - _BladeWidthDelta: 0.02
     - _BladeWidthMax: 0.025
-    - _BladeWidthMin: 0.005
+    - _BladeWidthMin: 0.01
     - _Blend: 0
     - _BumpScale: 1
     - _ClearCoatMask: 0
@@ -132,7 +140,7 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Surface: 0
-    - _TesselationFactor: 20
+    - _TesselationFactor: 6
     - _WindFrequency: 0.01
     - _WindStrength: 0.5
     - _WorkflowMode: 1
