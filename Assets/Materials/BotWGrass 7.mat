@@ -86,7 +86,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _WindMap:
         m_Texture: {fileID: 2800000, guid: 2a80618a09ec0b44b9fbfb47279d4d98, type: 3}
-        m_Scale: {x: 0.03, y: 0.03}
+        m_Scale: {x: 0.01, y: 0.01}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
         m_Texture: {fileID: 0}
@@ -102,19 +102,20 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _AlphaClip: 0
-    - _BendDelta: 0.2
-    - _BladeBendCurve: 2
-    - _BladeBendDistance: 0.38
+    - _BendDelta: 0.3
+    - _BladeBendCurve: 4
+    - _BladeBendDistance: 0.39
     - _BladeCurve: 2
     - _BladeForward: 0.38
     - _BladeHeight: 0.25
     - _BladeHeightDelta: 0.05
-    - _BladeHeightMax: 0.75
-    - _BladeHeightMin: 0.5
+    - _BladeHeightMax: 1.25
+    - _BladeHeightMin: 0.75
+    - _BladeSegments: 3
     - _BladeWidth: 0.015
     - _BladeWidthDelta: 0.02
-    - _BladeWidthMax: 0.025
-    - _BladeWidthMin: 0.01
+    - _BladeWidthMax: 0.05
+    - _BladeWidthMin: 0.02
     - _Blend: 0
     - _BumpScale: 1
     - _ClearCoatMask: 0
@@ -140,7 +141,7 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Surface: 0
-    - _TesselationFactor: 6
+    - _TesselationFactor: 4
     - _WindFrequency: 0.01
     - _WindStrength: 0.5
     - _WorkflowMode: 1
@@ -153,5 +154,5 @@ Material:
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _TipColor: {r: 1, g: 0.9906565, b: 0.60784316, a: 1}
     - _WindDirection: {r: 1, g: 0, b: 0, a: 0}
-    - _WindVelocity: {r: 0, g: 0.15, b: 0, a: 0}
+    - _WindVelocity: {r: 0.2, g: 0, b: 0.15, a: 0}
   m_BuildTextureStacks: []
