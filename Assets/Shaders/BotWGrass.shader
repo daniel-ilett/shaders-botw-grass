@@ -2,7 +2,6 @@ Shader "Custom/BotWGrass"
 {
 	Properties
 	{
-		//_GroundColor("Ground Color", Color) = (1, 1, 1, 1)
 		_BaseColor("Base Color", Color) = (1, 1, 1, 1)
 		_TipColor("Tip Color", Color) = (1, 1, 1, 1)
 		_BladeTexture("Blade Texture", 2D) = "white" {}
@@ -18,7 +17,7 @@ Shader "Custom/BotWGrass"
 
 		_BendDelta("Bend Variation", Range(0, 1)) = 0.2
 
-		_TesselationFactor("Tesselation Subdivisions", Range(1, 32)) = 1
+		_TessellationGrassDistance("Tessellation Grass Distance", Range(0.01, 2)) = 0.1
 
 		_GrassMap("Grass Visibility Map", 2D) = "white" {}
 		_GrassThreshold("Grass Visibility Threshold", Range(-0.1, 1)) = 0.5
@@ -53,9 +52,6 @@ Shader "Custom/BotWGrass"
 			#define BLADE_SEGMENTS 4
 			
 			CBUFFER_START(UnityPerMaterial)
-				//float4 _GroundColor;
-				sampler2D _BaseMap;
-
 				float4 _BaseColor;
 				float4 _TipColor;
 				sampler2D _BladeTexture;
@@ -70,7 +66,7 @@ Shader "Custom/BotWGrass"
 
 				float _BendDelta;
 
-				float _TesselationFactor;
+				float _TessellationGrassDistance;
 				
 				sampler2D _GrassMap;
 				float4 _GrassMap_ST;
@@ -164,7 +160,6 @@ Shader "Custom/BotWGrass"
 				o.vertex = v.vertex;
 				o.normal = v.normal;
 				o.tangent = v.tangent;
-				//o.uv = TRANSFORM_TEX(v.uv, _GrassMap);
 				o.uv = v.uv;
 				return o;
 			}
@@ -173,14 +168,38 @@ Shader "Custom/BotWGrass"
 			VertexOutput geomVert (VertexInput v)
             {
 				VertexOutput o; 
-				o.vertex = mul(unity_ObjectToWorld, v.vertex);
-				o.normal = v.normal;
+				o.vertex = float4(TransformObjectToWorld(v.vertex), 1.0f);
+				o.normal = TransformObjectToWorldNormal(v.normal);
 				o.tangent = v.tangent;
 				o.uv = TRANSFORM_TEX(v.uv, _GrassMap);
                 return o;
             }
 
-			// Tesselation hull and domain shaders derived from Catlike Coding's tutorial:
+			// This function lets us derive the tessellation factor for an edge
+			// from the vertices.
+			float tessellationEdgeFactor(VertexInput vert0, VertexInput vert1)
+			{
+				float3 v0 = vert0.vertex.xyz;
+				float3 v1 = vert1.vertex.xyz;
+				float edgeLength = distance(v0, v1);
+				return edgeLength / _TessellationGrassDistance;
+			}
+
+			// This is a test version of the tessellation that takes distance from the viewer
+			// into account. It works fine, but I think it could do with refinement.
+			float tessellationEdgeFactor_distanceTest(VertexInput vert0, VertexInput vert1)
+			{
+				float3 v0 = vert0.vertex.xyz;
+				float3 v1 = vert1.vertex.xyz;
+				float edgeLength = distance(v0, v1);
+
+				float3 edgeCenter = (v0 + v1) * 0.5f;
+				float viewDist = distance(edgeCenter, _WorldSpaceCameraPos) / 10.0f;
+
+				return edgeLength * _ScreenParams.y / (_TessellationGrassDistance * viewDist);
+			}
+
+			// Tessellation hull and domain shaders derived from Catlike Coding's tutorial:
 			// https://catlikecoding.com/unity/tutorials/advanced-rendering/tessellation/
 
 			// The patch constant function is where we create new control
@@ -191,15 +210,15 @@ Shader "Custom/BotWGrass"
 			{
 				TessellationFactors f;
 
-				f.edge[0] = _TesselationFactor;
-				f.edge[1] = _TesselationFactor;
-				f.edge[2] = _TesselationFactor;
-				f.inside = _TesselationFactor;
+				f.edge[0] = tessellationEdgeFactor(patch[1], patch[2]);
+				f.edge[1] = tessellationEdgeFactor(patch[2], patch[0]);
+				f.edge[2] = tessellationEdgeFactor(patch[0], patch[1]);
+				f.inside = (f.edge[0] + f.edge[1] + f.edge[2]) / 3.0f;
 
 				return f;
 			}
 
-			// The hull function is the first half of the tesselation shader.
+			// The hull function is the first half of the tessellation shader.
 			// It operates on each patch (in our case, a patch is a triangle),
 			// and outputs new control points for the other tessellation stages.
 			//
@@ -227,15 +246,15 @@ Shader "Custom/BotWGrass"
 			{
 				VertexInput i;
 
-				#define DOMAIN_INTERPOLATE(fieldname) i.fieldname = \
+				#define INTERPOLATE(fieldname) i.fieldname = \
 					patch[0].fieldname * barycentricCoordinates.x + \
 					patch[1].fieldname * barycentricCoordinates.y + \
 					patch[2].fieldname * barycentricCoordinates.z;
 
-				DOMAIN_INTERPOLATE(vertex)
-				DOMAIN_INTERPOLATE(normal)
-				DOMAIN_INTERPOLATE(tangent)
-				DOMAIN_INTERPOLATE(uv)
+				INTERPOLATE(vertex)
+				INTERPOLATE(normal)
+				INTERPOLATE(tangent)
+				INTERPOLATE(uv)
 
 				return tessVert(i);
 			}
@@ -245,7 +264,7 @@ Shader "Custom/BotWGrass"
 
 			// This function applies a transformation (during the geometry shader),
 			// converting to clip space in the process.
-			GeomData TransformGeomToLocal(float3 pos, float3 offset, float3x3 transformationMatrix, float2 uv)
+			GeomData TransformGeomToClip(float3 pos, float3 offset, float3x3 transformationMatrix, float2 uv)
 			{
 				GeomData o;
 
@@ -256,22 +275,12 @@ Shader "Custom/BotWGrass"
 				return o;
 			}
 
-			/*
-			GeomData CreateGrassVertex(float3 pos, float width, float height, float2 uv, float3x3 transformationMatrix)
-			{
-				float3 tangentPos = float3(width, 0, height);
-				float3 localPos = pos + mul(transformationMatrix, tangentPos);
-
-				return TransformGeomToLocal(localPos, uv);
-			}
-			*/
-
 			// This is the geometry shader. For each vertex on the mesh, a leaf
 			// blade is created by generating additional vertices.
 			[maxvertexcount(BLADE_SEGMENTS * 2 + 1)]
 			void geom(point VertexOutput input[1], inout TriangleStream<GeomData> triStream)
 			{
-				float grassVisibility = tex2Dlod(_GrassMap, float4(input[0].uv, 0, 0)).x;
+				float grassVisibility = tex2Dlod(_GrassMap, float4(input[0].uv, 0, 0)).r;
 
 				if (grassVisibility >= _GrassThreshold)
 				{
@@ -279,13 +288,13 @@ Shader "Custom/BotWGrass"
 
 					float3 normal = input[0].normal;
 					float4 tangent = input[0].tangent;
-					float3 binormal = cross(normal, tangent.xyz) * tangent.w;
+					float3 bitangent = cross(normal, tangent.xyz) * tangent.w;
 
 					float3x3 tangentToLocal = float3x3
 					(
-						tangent.x, binormal.x, normal.x,
-						tangent.y, binormal.y, normal.y,
-						tangent.z, binormal.z, normal.z
+						tangent.x, bitangent.x, normal.x,
+						tangent.y, bitangent.y, normal.y,
+						tangent.z, bitangent.z, normal.z
 					);
 
 					// Rotate around the y-axis a random amount.
@@ -300,15 +309,11 @@ Shader "Custom/BotWGrass"
 					float3 windAxis = normalize(float3(windSample.x, windSample.y, 0));
 					float3x3 windMatrix = angleAxis3x3(UNITY_PI * windSample, windAxis);
 
-
-
-					//
+					// Transform the grass blades to the correct tangent space.
 					float3x3 baseTransformationMatrix = mul(tangentToLocal, randRotMatrix);
 					float3x3 tipTransformationMatrix = mul(mul(mul(tangentToLocal, windMatrix), randBendMatrix), randRotMatrix);
 
 					float falloff = smoothstep(_GrassThreshold, _GrassThreshold + _GrassFalloff, grassVisibility);
-					float minWidth = falloff * _BladeWidthMin;
-					float minHeight = falloff * _BladeHeightMin;
 
 					float width  = lerp(_BladeWidthMin, _BladeWidthMax, rand(pos.xzy) * falloff);
 					float height = lerp(_BladeHeightMin, _BladeHeightMax, rand(pos.zyx) * falloff);
@@ -322,36 +327,17 @@ Shader "Custom/BotWGrass"
 
 						float3x3 transformationMatrix = (i == 0) ? baseTransformationMatrix : tipTransformationMatrix;
 
-						triStream.Append(TransformGeomToLocal(pos, float3( offset.x, offset.y, offset.z), transformationMatrix, float2(0, t)));
-						triStream.Append(TransformGeomToLocal(pos, float3(-offset.x, offset.y, offset.z), transformationMatrix, float2(1, t)));
+						triStream.Append(TransformGeomToClip(pos, float3( offset.x, offset.y, offset.z), transformationMatrix, float2(0, t)));
+						triStream.Append(TransformGeomToClip(pos, float3(-offset.x, offset.y, offset.z), transformationMatrix, float2(1, t)));
 					}
 
 					// Add the final vertex at the tip of the grass blade.
-					triStream.Append(TransformGeomToLocal(pos, float3(0, forward, height), tipTransformationMatrix, float2(0.5, 1)));
+					triStream.Append(TransformGeomToClip(pos, float3(0, forward, height), tipTransformationMatrix, float2(0.5, 1)));
 
 					triStream.RestartStrip();
 				}
 			}
 		ENDHLSL
-
-		/*
-		// This pass draws the ground beneath the grass, i.e. the original mesh.
-		Pass
-		{
-			Name "GroundPass"
-			Tags { "LightMode" = "UniversalForward" }
-
-			HLSLPROGRAM
-			#pragma vertex vert
-			#pragma fragment frag
-
-			float4 frag(VertexOutput v) : SV_Target
-			{
-				return _GroundColor;
-			}
-			ENDHLSL
-		}
-		*/
 
 		// This pass draws the grass blades generated by the geometry shader.
         Pass
@@ -363,17 +349,20 @@ Shader "Custom/BotWGrass"
 			#pragma require geometry
 			#pragma require tessellation tessHW
 
-            #pragma vertex geomVert
+			//#pragma vertex vert
+			#pragma vertex geomVert
 			#pragma hull hull
 			#pragma domain domain
 			#pragma geometry geom
             #pragma fragment frag
 
+			// The lighting sections of the frag shader taken from this helpful post by Ben Golus:
+			// https://forum.unity.com/threads/water-shader-graph-transparency-and-shadows-universal-render-pipeline-order.748142/#post-5518747
             float4 frag (GeomData i) : SV_Target
             {
 				float4 color = tex2D(_BladeTexture, i.uv);
 
-#ifdef _MAIN_LIGHT_SHADOWS
+			#ifdef _MAIN_LIGHT_SHADOWS
 				VertexPositionInputs vertexInput = (VertexPositionInputs)0;
 				vertexInput.positionWS = i.worldPos;
 
@@ -381,42 +370,12 @@ Shader "Custom/BotWGrass"
 				half shadowAttenuation = saturate(MainLightRealtimeShadow(shadowCoord) + 0.25f);
 				float4 shadowColor = lerp(0.0f, 1.0f, shadowAttenuation);
 				color *= shadowColor;
-#endif
+			#endif
 
                 return color * lerp(_BaseColor, _TipColor, i.uv.y);
 			}
+
 			ENDHLSL
 		}
-
-		/*
-		// Shadow-casting pass.
-		Pass
-		{
-			Name "ShadowCaster"
-			Tags { "LightMode" = "ShadowCaster" }
-
-			ZWrite On
-			ZTest LEqual
-
-			HLSLPROGRAM
-			#pragma require geometry
-			#pragma require tessellation tessHW
-
-			#pragma vertex geomVert
-			#pragma hull hull
-			#pragma domain domain
-			#pragma geometry geom
-			#pragma fragment frag
-			#pragma multi_compile_shadowcaster
-
-			float4 frag(GeomData i) : SV_Target
-			{
-				//SHADOW_CASTER_FRAGMENT(i)
-
-				return 1;
-			}
-			ENDHLSL
-		}
-		*/
     }
 }
