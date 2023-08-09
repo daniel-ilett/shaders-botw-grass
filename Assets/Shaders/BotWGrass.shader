@@ -168,7 +168,7 @@ Shader "Custom/BotWGrass"
 			VertexOutput geomVert (VertexInput v)
             {
 				VertexOutput o; 
-				o.vertex = float4(TransformObjectToWorld(v.vertex), 1.0f);
+				o.vertex = v.vertex;
 				o.normal = TransformObjectToWorldNormal(v.normal);
 				o.tangent = v.tangent;
 				o.uv = TRANSFORM_TEX(v.uv, _GrassMap);
