@@ -268,9 +268,9 @@ Shader "Custom/BotWGrass"
 			{
 				GeomData o;
 
-				o.pos = TransformObjectToHClip(pos + mul(transformationMatrix, offset));
+				o.pos = TransformWorldToHClip(pos + mul(transformationMatrix, offset));
 				o.uv = uv;
-				o.worldPos = TransformObjectToWorld(pos + mul(transformationMatrix, offset));
+				o.worldPos = TransformWorldToHClip(pos + mul(transformationMatrix, offset));
 
 				return o;
 			}
